@@ -2,26 +2,19 @@ import requests
 import json
 import os
 
-from pypushdeer import PushDeer
-
-# -------------------------------------------------------------------------------------------
-# github workflows
-# -------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-    # pushdeer key 申请地址 https://www.pushdeer.com/product.html
-    sckey = os.environ.get("SENDKEY", "")
+    bot_token = os.environ.get("BOT_TOKEN", "")
+    chat_id = os.environ.get("CHAT_ID", "")
 
-    # 推送内容
     title = ""
-    success, fail, repeats = 0, 0, 0        # 成功账号数量 失败账号数量 重复签到账号数量
+    success, fail, repeats = 0, 0, 0
     context = ""
 
-    # glados账号cookie 直接使用数组 如果使用环境变量需要字符串分割一下
     cookies = os.environ.get("COOKIES", []).split("&")
-    if cookies[0] != "":
+    if cookies and cookies[0] != "":
 
-        check_in_url = "https://glados.space/api/user/checkin"        # 签到地址
-        status_url = "https://glados.space/api/user/status"          # 查看账户状态
+        check_in_url = "https://glados.space/api/user/checkin"
+        status_url = "https://glados.space/api/user/status"
 
         referer = 'https://glados.space/console/checkin'
         origin = "https://glados.space"
@@ -29,7 +22,7 @@ if __name__ == '__main__':
         payload = {
             'token': 'glados.one'
         }
-        
+
         for cookie in cookies:
             checkin = requests.post(check_in_url, headers={'cookie': cookie, 'referer': referer, 'origin': origin,
                                     'user-agent': useragent, 'content-type': 'application/json;charset=UTF-8'}, data=json.dumps(payload))
@@ -39,22 +32,16 @@ if __name__ == '__main__':
             message_status = ""
             points = 0
             message_days = ""
-            
-            
+
             if checkin.status_code == 200:
-                # 解析返回的json数据
-                result = checkin.json()     
-                # 获取签到结果
+                result = checkin.json()
                 check_result = result.get('message')
                 points = result.get('points')
 
-                # 获取账号当前状态
                 result = state.json()
-                # 获取剩余时间
                 leftdays = int(float(result['data']['leftDays']))
-                # 获取账号email
                 email = result['data']['email']
-                
+
                 print(check_result)
                 if "Checkin! Got" in check_result:
                     success += 1
@@ -77,21 +64,28 @@ if __name__ == '__main__':
 
             context += "账号: " + email + ", P: " + str(points) +", 剩余: " + message_days + " | "
 
-        # 推送内容 
         title = f'Glados, 成功{success},失败{fail},重复{repeats}'
         print("Send Content:" + "\n", context)
-        
+
     else:
-        # 推送内容 
         title = f'# 未找到 cookies!'
 
-    print("sckey:", sckey)
+    print("bot_token:", bot_token)
+    print("chat_id:", chat_id)
     print("cookies:", cookies)
-    
-    # 推送消息
-    # 未设置 sckey 则不进行推送
-    if not sckey:
-        print("Not push")
+
+    if not bot_token or not chat_id:
+        print("Telegram BOT_TOKEN or CHAT_ID not set. Not pushing.")
     else:
-        pushdeer = PushDeer(pushkey=sckey) 
-        pushdeer.send_text(title, desp=context)
+        telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        message_text = title + "\n" + context
+        payload = {
+            'chat_id': chat_id,
+            'text': message_text
+        }
+        try:
+            response = requests.post(telegram_url, data=payload)
+            response.raise_for_status()
+            print("Telegram message sent successfully.")
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to send Telegram message: {e}")
